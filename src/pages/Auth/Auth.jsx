@@ -54,6 +54,9 @@ const AuthForm = ({ type }) => {
         }
     };
 
+    console.log(import.meta.env.VITE_API_BASE_URL);
+    
+
     return (
         <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-900 to-purple-800 text-white">
             <div className="bg-white text-gray-900 p-8 rounded-lg shadow-white shadow-2xl w-full max-w-md m-2">
