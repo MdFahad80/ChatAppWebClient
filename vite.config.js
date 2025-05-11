@@ -3,6 +3,7 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { NodeGlobalsPolyfillPlugin } from '@esbuild-plugins/node-globals-polyfill';
 import { NodeModulesPolyfillPlugin } from '@esbuild-plugins/node-modules-polyfill';
+import rollupNodePolyFill from 'rollup-plugin-node-polyfills';
 
 export default defineConfig({
   plugins: [
@@ -10,6 +11,7 @@ export default defineConfig({
     tailwindcss(), 
    ],
   optimizeDeps: {
+    include: ['buffer'],
     esbuildOptions: {
       define: {
         global: 'globalThis'  // Correct polyfill for 'global'
@@ -27,10 +29,16 @@ export default defineConfig({
     alias: {
       stream: 'stream-browserify',
       crypto: 'crypto-browserify',
-      events: 'events/'
+      events: 'events/',
+      buffer: 'buffer',
     }
   },
   define: {
     global: "window" // Critical fix for `global is not defined`
-  }
+  },
+  build: {
+    rollupOptions: {
+      plugins: [rollupNodePolyFill()],
+    },
+  },
 });
