@@ -1,17 +1,23 @@
-import React, { use, useEffect, useRef, useState } from 'react';
-import socketInstance from '../components/socketio/VideoCallSocket';
+import { useLocation } from "react-router-dom";
+import React, { use, useEffect, useRef, useState } from "react";
+import socketInstance from "../components/socketio/VideoCallSocket";
 import { FaBars, FaTimes, FaPhoneAlt, FaMicrophone, FaVideo, FaVideoSlash, FaMicrophoneSlash } from "react-icons/fa";
 import Lottie from "lottie-react";
 import { Howl } from "howler";
 import wavingAnimation from "../../assets/waving.json";
 import { FaPhoneSlash } from "react-icons/fa6";
 import apiClient from "../../apiClient";
-import { useUser } from '../../context/UserContextApi';
+import { useUser } from "../../context/UserContextApi";
 import { RiLogoutBoxLine } from "react-icons/ri";
-import { Link, useNavigate } from 'react-router-dom';
-import Peer from 'simple-peer'
+import { Link, useNavigate } from "react-router-dom";
+import Peer from "simple-peer";
+import { IoCall, IoVideocam } from "react-icons/io5";
 
-const Dashboard = () => {
+export default function UserDetails() {
+  const location = useLocation();
+  const { _id, email, profilepic, username } = location.state.modalUser || {};
+  
+
   const { user, updateUser } = useUser();
   const navigate = useNavigate();
   const [users, setUsers] = useState([]);
@@ -34,11 +40,10 @@ const Dashboard = () => {
   const [callerName, setCallerName] = useState("");
   const [callerSignal, setCallerSignal] = useState(null);
   const [callAccepted, setCallAccepted] = useState(false);
-  const [callerWating, setCallerWating] = useState(false)
+  const [callerWating, setCallerWating] = useState(false);
 
   const [callRejectedPopUp, setCallRejectedPopUp] = useState(false);
   const [rejectorData, setCallrejectorData] = useState(null);
-
 
   // 🔹 State to track microphone & video status
   const [isMicOn, setIsMicOn] = useState(true);
@@ -47,7 +52,7 @@ const Dashboard = () => {
   // 🔥 Load ringtone
   const ringtone = new Howl({
     src: ["/ringtone.mp3"], // ✅ Replace with your ringtone file
-    loop: false,  // ✅ Keep ringing until stopped
+    loop: false, // ✅ Keep ringing until stopped
     volume: 1.0, // ✅ Full volume
   });
 
@@ -65,10 +70,10 @@ const Dashboard = () => {
     socket.on("me", (id) => setMe(id));
     // Listen for "callToUser" event, which means another user is calling the current user.
     socket.on("callToUser", (data) => {
-      setReciveCall(true);  // Set state to indicate an incoming call.
-      setCaller(data);      // Store caller's information in state.
-      setCallerName(data.name);  // Store caller's name.
-      setCallerSignal(data.signal);  // Store WebRTC signal data for the call.
+      setReciveCall(true); // Set state to indicate an incoming call.
+      setCaller(data); // Store caller's information in state.
+      setCallerName(data.name); // Store caller's name.
+      setCallerSignal(data.signal); // Store WebRTC signal data for the call.
       // ✅ Start playing ringtone
       ringtone.play();
     });
@@ -85,7 +90,7 @@ const Dashboard = () => {
       console.log("Call ended by", data.name); // Log the event in the console.
       // ✅ Stop ringtone in case call is ended before acceptance
       ringtone.stop();
-      endCallCleanup();  // Call a function to clean up the call state.
+      endCallCleanup(); // Call a function to clean up the call state.
     });
     // Listen for "userUnavailable" event, meaning the user being called is not online.
     socket.on("userUnavailable", (data) => {
@@ -101,16 +106,15 @@ const Dashboard = () => {
     });
     // Cleanup function: Runs when the component unmounts or dependencies change.
     return () => {
-      socket.off("me");  // Remove listener for "me" event.
-      socket.off("callToUser");  // Remove listener for incoming calls.
-      socket.off("callRejected");  // Remove listener for call rejection.
-      socket.off("callEnded");  // Remove listener for call ending.
-      socket.off("userUnavailable");  // Remove listener for unavailable user.
-      socket.off("userBusy");  // Remove listener for busy user.
-      socket.off("online-users");  // Remove listener for online users list.
+      socket.off("me"); // Remove listener for "me" event.
+      socket.off("callToUser"); // Remove listener for incoming calls.
+      socket.off("callRejected"); // Remove listener for call rejection.
+      socket.off("callEnded"); // Remove listener for call ending.
+      socket.off("userUnavailable"); // Remove listener for unavailable user.
+      socket.off("userBusy"); // Remove listener for busy user.
+      socket.off("online-users"); // Remove listener for online users list.
     };
   }, [user, socket]); // Dependencies: This effect runs whenever `user` or `socket` changes.
-
 
   const startCall = async () => {
     try {
@@ -119,8 +123,8 @@ const Dashboard = () => {
         video: true, // Enable video
         audio: {
           echoCancellation: true, // ✅ Reduce echo in audio
-          noiseSuppression: true  // ✅ Reduce background noise
-        }
+          noiseSuppression: true, // ✅ Reduce background noise
+        },
       });
       // ✅ Store the stream in state so it can be used later
       setStream(currentStream);
@@ -128,20 +132,20 @@ const Dashboard = () => {
       if (myVideo.current) {
         myVideo.current.srcObject = currentStream;
         myVideo.current.muted = true; // ✅ Mute local audio to prevent feedback
-        myVideo.current.volume = 0;   // ✅ Set volume to zero to avoid echo
+        myVideo.current.volume = 0; // ✅ Set volume to zero to avoid echo
       }
       // ✅ Ensure that the audio track is enabled
-      currentStream.getAudioTracks().forEach(track => (track.enabled = true));
+      currentStream.getAudioTracks().forEach((track) => (track.enabled = true));
       // ✅ Close the sidebar (if open) and set the selected user for the call
       setCallRejectedPopUp(false);
       setIsSidebarOpen(false);
-      setCallerWating(true);//wating to join reciver
+      setCallerWating(true); //wating to join reciver
       setSelectedUser(modalUser._id);
       // ✅ Create a new Peer connection (WebRTC) as the call initiator
       const peer = new Peer({
         initiator: true, // ✅ This user starts the call
-        trickle: false,  // ✅ Prevents trickling of ICE candidates, ensuring a single signal exchange
-        stream: currentStream // ✅ Attach the local media stream
+        trickle: false, // ✅ Prevents trickling of ICE candidates, ensuring a single signal exchange
+        stream: currentStream, // ✅ Attach the local media stream
       });
       // ✅ Handle the "signal" event (this occurs when the WebRTC handshake is initiated)
       peer.on("signal", (data) => {
@@ -167,7 +171,7 @@ const Dashboard = () => {
       socket.once("callAccepted", (data) => {
         setCallRejectedPopUp(false);
         setCallAccepted(true); // ✅ Mark call as accepted
-        setCallerWating(false);//reciver join the call
+        setCallerWating(false); //reciver join the call
         setCaller(data.from); // ✅ Store caller's ID
         peer.signal(data.signal); // ✅ Pass the received WebRTC signal to establish the connection
       });
@@ -184,7 +188,7 @@ const Dashboard = () => {
     try {
       // 🔁 Stop existing stream if stored globally (optional)
       if (window.activeStream) {
-        window.activeStream.getTracks().forEach(track => track.stop());
+        window.activeStream.getTracks().forEach((track) => track.stop());
         window.activeStream = null;
       }
 
@@ -193,13 +197,12 @@ const Dashboard = () => {
         video: true,
         audio: {
           echoCancellation: true,
-          noiseSuppression: true
-        }
+          noiseSuppression: true,
+        },
       });
 
       window.activeStream = stream; // Optional for reusability
       return stream.clone(); // ✅ Cloning helps avoid device-in-use errors across tabs
-
     } catch (error) {
       console.error("❌ Media device access error:", error);
       if (error.name === "NotReadableError") {
@@ -212,7 +215,6 @@ const Dashboard = () => {
       return null;
     }
   };
-
 
   const handelacceptCall = async () => {
     ringtone.stop();
@@ -228,7 +230,7 @@ const Dashboard = () => {
       myVideo.current.volume = 0;
     }
 
-    currentStream.getAudioTracks().forEach(track => (track.enabled = true));
+    currentStream.getAudioTracks().forEach((track) => (track.enabled = true));
 
     setCallAccepted(true);
     setReciveCall(true);
@@ -238,7 +240,7 @@ const Dashboard = () => {
     const peer = new Peer({
       initiator: false,
       trickle: false,
-      stream: currentStream
+      stream: currentStream,
     });
 
     peer.on("signal", (data) => {
@@ -262,12 +264,11 @@ const Dashboard = () => {
     connectionRef.current = peer;
   };
 
-
   const handelrejectCall = () => {
     // ✅ Stop ringtone when call is accepted
     ringtone.stop();
     // ✅ Update the state to indicate that the call is rejected
-    setCallerWating(false);//reciver reject the call
+    setCallerWating(false); //reciver reject the call
     setReciveCall(false); // ✅ The user is no longer receiving a call
     setCallAccepted(false); // ✅ Ensure the call is not accepted
 
@@ -275,7 +276,7 @@ const Dashboard = () => {
     socket.emit("reject-call", {
       to: caller.from, // ✅ The caller's ID (who initiated the call)
       name: user.username, // ✅ The name of the user rejecting the call
-      profilepic: user.profilepic // ✅ Placeholder profile picture of the user rejecting the call
+      profilepic: user.profilepic, // ✅ Placeholder profile picture of the user rejecting the call
     });
   };
 
@@ -287,7 +288,7 @@ const Dashboard = () => {
     // ✅ Notify the other user that the call has ended
     socket.emit("call-ended", {
       to: caller?.from || selectedUser, // ✅ Send call end signal to the caller or selected user
-      name: user.username // ✅ Send the username to inform the other party
+      name: user.username, // ✅ Send the username to inform the other party
     });
 
     // ✅ Perform cleanup actions after ending the call
@@ -325,7 +326,6 @@ const Dashboard = () => {
     }, 100);
   };
 
-
   // 🎤 Toggle Microphone
   const toggleMic = () => {
     if (stream) {
@@ -347,12 +347,10 @@ const Dashboard = () => {
     }
   };
 
-
-
   const allusers = async () => {
     try {
       setLoading(true);
-      const response = await apiClient.get('/user');
+      const response = await apiClient.get("/user");
       if (response.data.success !== false) {
         setUsers(response.data.users);
       }
@@ -374,15 +372,12 @@ const Dashboard = () => {
       alert("You must end the current call before starting a new one.");
       return;
     }
-    const selected = filteredUsers.find(user => user._id === userId);
+    const selected = filteredUsers.find((user) => user._id === userId);
     setModalUser(selected);
     setShowUserDetailModal(true);
   };
 
-  const filteredUsers = users.filter((u) =>
-    u.username.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    u.email.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filteredUsers = users.filter((u) => u.username.toLowerCase().includes(searchQuery.toLowerCase()) || u.email.toLowerCase().includes(searchQuery.toLowerCase()));
 
   const handleLogout = async () => {
     if (callAccepted || reciveCall) {
@@ -390,82 +385,51 @@ const Dashboard = () => {
       return;
     }
     try {
-      await apiClient.post('/auth/logout');
+      await apiClient.post("/auth/logout");
       socket.off("disconnect");
       socket.disconnect();
       socketInstance.setSocket();
       updateUser(null);
       localStorage.removeItem("userData");
-      navigate('/login');
+      navigate("/login");
     } catch (error) {
       console.error("Logout failed", error);
     }
   };
 
-  console.log(callerWating);
-
   return (
     <div className="flex min-h-screen bg-gray-100">
       {/* Mobile Overlay */}
-      {isSidebarOpen && (
-        <div
-          className="fixed inset-0 z-10 md:hidden"
-          onClick={() => setIsSidebarOpen(false)}
-        ></div>
-      )}
+      {isSidebarOpen && <div className="fixed inset-0 z-10 md:hidden" onClick={() => setIsSidebarOpen(false)}></div>}
 
       {/* Sidebar */}
-      <aside
-        className={`bg-gradient-to-br from-blue-900 to-purple-800 text-white w-64 h-full p-4 space-y-4 fixed z-20 transition-transform ${isSidebarOpen ? "translate-x-0" : "-translate-x-full"
-          } md:translate-x-0`}
-      >
+      <aside className={`bg-gradient-to-br from-blue-900 to-purple-800 text-white w-64 h-full p-4 space-y-4 fixed z-20 transition-transform ${isSidebarOpen ? "translate-x-0" : "-translate-x-full"} md:translate-x-0`}>
         <div className="flex items-center justify-between">
           <h1 className="text-2xl font-bold">Users</h1>
-          <button
-            type="button"
-            className="md:hidden text-white"
-            onClick={() => setIsSidebarOpen(false)}
-          >
+          <button type="button" className="md:hidden text-white" onClick={() => setIsSidebarOpen(false)}>
             <FaTimes />
           </button>
         </div>
 
         {/* Search */}
-        <input
-          type="text"
-          placeholder="Search user..."
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          className="w-full px-3 py-2 rounded-md bg-gray-800 text-white border border-gray-700 mb-2"
-        />
+        <input type="text" placeholder="Search user..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="w-full px-3 py-2 rounded-md bg-gray-800 text-white border border-gray-700 mb-2" />
 
         {/* User List */}
         <ul className="space-y-4 overflow-y-auto">
           {filteredUsers.map((user) => (
             <li
               key={user._id}
-              className={`flex items-center gap-3 p-2 rounded-lg cursor-pointer ${selectedUser === user._id
-                ? "bg-green-600"
-                : "bg-gradient-to-r from-purple-600 to-blue-400"
-                }`}
-            // onClick={() => handelSelectedUser(user._id)}
+              className={`flex items-center gap-3 p-2 rounded-lg cursor-pointer ${selectedUser === user._id ? "bg-green-600" : "bg-gradient-to-r from-purple-600 to-blue-400"}`}
+              // onClick={() => handelSelectedUser(user._id)}
             >
               <Link to={`/dashboard/${user._id}`} state={{ modalUser: user }} className="flex items-center gap-3">
                 <div className="relative">
-                  <img
-                    src={user.profilepic || "/default-avatar.png"}
-                    alt={`${user.username}'s profile`}
-                    className="w-10 h-10 rounded-full border border-white"
-                  />
-                  {isOnlineUser(user._id) && (
-                    <span className="absolute top-0 right-0 w-3 h-3 bg-green-500 border-2 border-gray-800 rounded-full shadow-lg animate-bounce"></span>
-                  )}
+                  <img src={user.profilepic || "/default-avatar.png"} alt={`${user.username}'s profile`} className="w-10 h-10 rounded-full border border-white" />
+                  {isOnlineUser(user._id) && <span className="absolute top-0 right-0 w-3 h-3 bg-green-500 border-2 border-gray-800 rounded-full shadow-lg animate-bounce"></span>}
                 </div>
                 <div className="flex flex-col">
                   <span className="font-bold text-sm">{user.username}</span>
-                  <span className="text-xs text-gray-400 truncate w-32">
-                    {user.email}
-                  </span>
+                  <span className="text-xs text-gray-400 truncate w-32">{user.email}</span>
                 </div>
               </Link>
             </li>
@@ -473,54 +437,38 @@ const Dashboard = () => {
         </ul>
 
         {/* Logout */}
-        {user && <div
-          onClick={handleLogout}
-          className="absolute bottom-2 left-4 right-4 flex items-center gap-2 bg-red-400 px-4 py-1 cursor-pointer rounded-lg"
-        >
-          <RiLogoutBoxLine />
-          Logout
-        </div>}
+        {user && (
+          <div onClick={handleLogout} className="absolute bottom-2 left-4 right-4 flex items-center gap-2 bg-red-400 px-4 py-1 cursor-pointer rounded-lg">
+            <RiLogoutBoxLine />
+            Logout
+          </div>
+        )}
       </aside>
 
       {/* Main Content */}
       {selectedUser || reciveCall || callAccepted ? (
         <div className="relative w-full h-screen bg-black flex items-center justify-center">
           {/* Remote Video */}
-          {callerWating ? <div>
-            <div className="flex flex-col items-center">
-              <p className='font-black text-xl mb-2'>User Details</p>
-              <img
-                src={modalUser.profilepic || "/default-avatar.png"}
-                alt="User"
-                className="w-20 h-20 rounded-full border-4 border-blue-500 animate-bounce"
-              />
-              <h3 className="text-lg font-bold mt-3 text-white">{modalUser.username}</h3>
-              <p className="text-sm text-gray-300">{modalUser.email}</p>
+          {callerWating ? (
+            <div>
+              <div className="flex flex-col items-center">
+                <p className="font-black text-xl mb-2">User Details</p>
+                <img src={modalUser.profilepic || "/default-avatar.png"} alt="User" className="w-20 h-20 rounded-full border-4 border-blue-500 animate-bounce" />
+                <h3 className="text-lg font-bold mt-3 text-white">{modalUser.username}</h3>
+                <p className="text-sm text-gray-300">{modalUser.email}</p>
+              </div>
             </div>
-          </div> :
-            <video
-              ref={reciverVideo}
-              autoPlay
-              className="absolute top-0 left-0 w-full h-full object-contain rounded-lg"
-            />
-          }
+          ) : (
+            <video ref={reciverVideo} autoPlay className="absolute top-0 left-0 w-full h-full object-contain rounded-lg" />
+          )}
           {/* Local PIP Video */}
           <div className="absolute bottom-[75px] md:bottom-0 right-1 bg-gray-900 rounded-lg overflow-hidden shadow-lg">
-            <video
-              ref={myVideo}
-              autoPlay
-              playsInline
-              className="w-32 h-40 md:w-56 md:h-52 object-cover rounded-lg"
-            />
+            <video ref={myVideo} autoPlay playsInline className="w-32 h-40 md:w-56 md:h-52 object-cover rounded-lg" />
           </div>
 
           {/* Username + Sidebar Button */}
           <div className="absolute top-4 left-4 text-white text-lg font-bold flex gap-2 items-center">
-            <button
-              type="button"
-              className="md:hidden text-2xl text-white cursor-pointer"
-              onClick={() => setIsSidebarOpen(true)}
-            >
+            <button type="button" className="md:hidden text-2xl text-white cursor-pointer" onClick={() => setIsSidebarOpen(true)}>
               <FaBars />
             </button>
             {callerName || "Caller"}
@@ -528,71 +476,46 @@ const Dashboard = () => {
 
           {/* Call Controls */}
           <div className="absolute bottom-4 w-full flex justify-center gap-4">
-            <button
-              type="button"
-              className="bg-red-600 p-4 rounded-full text-white shadow-lg cursor-pointer"
-              onClick={handelendCall}
-            >
+            <button type="button" className="bg-red-600 p-4 rounded-full text-white shadow-lg cursor-pointer" onClick={handelendCall}>
               <FaPhoneSlash size={24} />
             </button>
             {/* 🎤 Toggle Mic */}
-            <button
-              type="button"
-              onClick={toggleMic}
-              className={`p-4 rounded-full text-white shadow-lg cursor-pointer transition-colors ${isMicOn ? "bg-green-600" : "bg-red-600"
-                }`}
-            >
+            <button type="button" onClick={toggleMic} className={`p-4 rounded-full text-white shadow-lg cursor-pointer transition-colors ${isMicOn ? "bg-green-600" : "bg-red-600"}`}>
               {isMicOn ? <FaMicrophone size={24} /> : <FaMicrophoneSlash size={24} />}
             </button>
 
             {/* 📹 Toggle Video */}
-            <button
-              type="button"
-              onClick={toggleCam}
-              className={`p-4 rounded-full text-white shadow-lg cursor-pointer transition-colors ${isCamOn ? "bg-green-600" : "bg-red-600"
-                }`}
-            >
+            <button type="button" onClick={toggleCam} className={`p-4 rounded-full text-white shadow-lg cursor-pointer transition-colors ${isCamOn ? "bg-green-600" : "bg-red-600"}`}>
               {isCamOn ? <FaVideo size={24} /> : <FaVideoSlash size={24} />}
             </button>
-
-
           </div>
         </div>
       ) : (
         <div className="flex-1 p-6 md:ml-72 text-white">
           {/* Mobile Sidebar Toggle */}
-          <button
-            type="button"
-            className="md:hidden text-2xl text-black mb-4"
-            onClick={() => setIsSidebarOpen(true)}
-          >
+          <button type="button" className="md:hidden text-2xl text-black mb-4" onClick={() => setIsSidebarOpen(true)}>
             <FaBars />
           </button>
 
           {/* Welcome */}
-          <div className="flex items-center gap-5 mb-6 bg-gray-800 p-5 rounded-xl shadow-md">
-            <div className="w-20 h-20">
-              <Lottie animationData={wavingAnimation} loop autoplay />
+          <div className="mb-6 bg-gray-800 p-5 rounded-xl shadow-md">
+            <div className="flex items-center justify-between mb-4">
+              <div className="w-[50%] h-[50%] flex items-center gap-4">
+                <img className="inline-block size-15 rounded-full ring-2 ring-white" src={profilepic} alt="" />
+                <div>
+                  <h1 className="text-2xl font-extrabold bg-gradient-to-r from-blue-400 to-purple-500 text-transparent bg-clip-text">Hey {username || "Guest"}! 👋</h1>
+                  <span className="text-lg text-gray-300 mt-2">{email}</span>
+                </div>
+              </div>
+              <div className="flex gap-4">
+                <button type="button" className="text-white px-4 py-2 rounded-lg flex items-center gap-2">
+                  <IoCall className="text-2xl cursor-pointer" />
+                </button>
+                <button type="button" className="text-white px-4 py-2 rounded-lg flex items-center gap-2" onClick={() => handelSelectedUser(_id)}>
+                  <IoVideocam className="text-2xl cursor-pointer" />
+                </button>
+              </div>
             </div>
-            <div>
-              <h1 className="text-4xl font-extrabold bg-gradient-to-r from-blue-400 to-purple-500 text-transparent bg-clip-text">
-                Hey {user?.username || "Guest"}! 👋
-              </h1>
-              <p className="text-lg text-gray-300 mt-2">
-                Ready to <strong>connect with friends instantly?</strong>
-                Just <strong>select a user</strong> and start your video call! 🎥✨
-              </p>
-            </div>
-          </div>
-
-          {/* Instructions */}
-          <div className="bg-gray-800 p-4 rounded-lg shadow-lg text-sm">
-            <h2 className="text-lg font-semibold mb-2">💡 How to Start a Video Call?</h2>
-            <ul className="list-disc pl-5 space-y-2 text-gray-400">
-              <li>📌 Open the sidebar to see online users.</li>
-              <li>🔍 Use the search bar to find a specific person.</li>
-              <li>🎥 Click on a user to start a video call instantly!</li>
-            </ul>
           </div>
         </div>
       )}
@@ -601,12 +524,8 @@ const Dashboard = () => {
         <div className="fixed inset-0 bg-transparent bg-opacity-30 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-lg shadow-lg max-w-md w-full p-6">
             <div className="flex flex-col items-center">
-              <p className='font-black text-xl mb-2'>User Details</p>
-              <img
-                src={modalUser.profilepic || "/default-avatar.png"}
-                alt="User"
-                className="w-20 h-20 rounded-full border-4 border-blue-500"
-              />
+              <p className="font-black text-xl mb-2">User Details</p>
+              <img src={modalUser.profilepic || "/default-avatar.png"} alt="User" className="w-20 h-20 rounded-full border-4 border-blue-500" />
               <h3 className="text-lg font-bold mt-3">{modalUser.username}</h3>
               <p className="text-sm text-gray-500">{modalUser.email}</p>
 
@@ -621,10 +540,7 @@ const Dashboard = () => {
                 >
                   Call <FaPhoneAlt />
                 </button>
-                <button
-                  onClick={() => setShowUserDetailModal(false)}
-                  className="bg-gray-400 text-white px-4 py-1 rounded-lg w-28"
-                >
+                <button onClick={() => setShowUserDetailModal(false)} className="bg-gray-400 text-white px-4 py-1 rounded-lg w-28">
                   Cancel
                 </button>
               </div>
@@ -638,11 +554,7 @@ const Dashboard = () => {
           <div className="bg-white rounded-lg shadow-lg max-w-md w-full p-6">
             <div className="flex flex-col items-center">
               <p className="font-black text-xl mb-2">Call Rejected From...</p>
-              <img
-                src={rejectorData.profilepic || "/default-avatar.png"}
-                alt="Caller"
-                className="w-20 h-20 rounded-full border-4 border-green-500"
-              />
+              <img src={rejectorData.profilepic || "/default-avatar.png"} alt="Caller" className="w-20 h-20 rounded-full border-4 border-green-500" />
               <h3 className="text-lg font-bold mt-3">{rejectorData.name}</h3>
               <div className="flex gap-4 mt-5">
                 <button
@@ -676,26 +588,14 @@ const Dashboard = () => {
           <div className="bg-white rounded-lg shadow-lg max-w-md w-full p-6">
             <div className="flex flex-col items-center">
               <p className="font-black text-xl mb-2">Call From...</p>
-              <img
-                src={caller?.profilepic || "/default-avatar.png"}
-                alt="Caller"
-                className="w-20 h-20 rounded-full border-4 border-green-500"
-              />
+              <img src={caller?.profilepic || "/default-avatar.png"} alt="Caller" className="w-20 h-20 rounded-full border-4 border-green-500" />
               <h3 className="text-lg font-bold mt-3">{callerName}</h3>
               <p className="text-sm text-gray-500">{caller?.email}</p>
               <div className="flex gap-4 mt-5">
-                <button
-                  type="button"
-                  onClick={handelacceptCall}
-                  className="bg-green-500 text-white px-4 py-1 rounded-lg w-28 flex gap-2 justify-center items-center"
-                >
+                <button type="button" onClick={handelacceptCall} className="bg-green-500 text-white px-4 py-1 rounded-lg w-28 flex gap-2 justify-center items-center">
                   Accept <FaPhoneAlt />
                 </button>
-                <button
-                  type="button"
-                  onClick={handelrejectCall}
-                  className="bg-red-500 text-white px-4 py-2 rounded-lg w-28 flex gap-2 justify-center items-center"
-                >
+                <button type="button" onClick={handelrejectCall} className="bg-red-500 text-white px-4 py-2 rounded-lg w-28 flex gap-2 justify-center items-center">
                   Reject <FaPhoneSlash />
                 </button>
               </div>
@@ -704,8 +604,5 @@ const Dashboard = () => {
         </div>
       )}
     </div>
-
   );
-};
-
-export default Dashboard;
+}
